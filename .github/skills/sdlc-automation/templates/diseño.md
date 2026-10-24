@@ -10,20 +10,34 @@
 
 ## 1. Diagrama de Arquitectura de Componentes
 
+> **Directriz de Patrón Arquitectónico:**
+> - **En Python:** Capas modulares / Clean Architecture (`routers/`, `services/`, `models/`, `repositories/`).
+> - **En Java:** **Arquitectura Hexagonal Obligatoria (Ports & Adapters)**:
+>   - `domain/`: Modelos, Value Objects y excepciones de negocio puros en Java (sin dependencias de frameworks ni Spring).
+>   - `application/port/in/`: Puertos de entrada (casos de uso) y DTOs de comando/resultado.
+>   - `application/port/out/`: Puertos de salida hacia infraestructura (persistencia SQL, caché, servicios externos).
+>   - `application/service/`: Implementación de casos de uso orquestando el dominio y los puertos.
+>   - `infrastructure/adapter/in/`: Adaptadores primarios (ej. REST Controllers, Web MVC).
+>   - `infrastructure/adapter/out/`: Adaptadores secundarios (ej. JPA Repositories para SQL, Redis Cache).
+
+### Diagrama General (Python) o Hexagonal (Java)
 ```mermaid
 graph TD
-    subgraph "Capa de Presentación / API"
-        A["{Router_O_Controller}"] --> B["{Service_Layer}"]
+    subgraph "Adaptadores Primarios / Driving (Entrada)"
+        A["{Router_O_Controller}"] --> B["{Inbound_Port_O_UseCase}"]
     end
 
-    subgraph "Capa de Dominio y Negocio"
-        B --> C["{Entidad_O_Modelo_Dominio}"]
-        B --> D["{Security_O_Validation_Service}"]
+    subgraph "Hexágono de Dominio y Aplicación"
+        B --> C["{Application_Service}"]
+        C --> D["{Domain_Model_Pure_Java_O_Python}"]
+        C --> E["{Outbound_Port_Interface}"]
     end
 
-    subgraph "Capa de Infraestructura y Persistencia"
-        B --> E["{Repository_O_SQL_Adapter}"]
-        E --> F[("Base de Datos SQL / Cache Redis")]
+    subgraph "Adaptadores Secundarios / Driven (Salida)"
+        E --> F["{Persistence_Adapter_SQL_JPA}"]
+        E --> G["{Cache_Adapter_Redis}"]
+        F --> H[("Base de Datos SQL")]
+        G --> I[("Caché Redis")]
     end
 ```
 
@@ -31,11 +45,13 @@ graph TD
 
 ## 2. Inventario de Archivos Impactados
 
-| Ruta de Archivo | Tipo de Acción | Justificación Técnica (Vínculo EARS) |
-| :--- | :--- | :--- |
-| `{src/path/to/existing_file.py|.java}` | Modificar | {Motivo del cambio referenciando REQ-EVT-01} |
-| `{src/path/to/new_module.py|.java}` | Crear | {Responsabilidad modular según REQ-STA-01} |
-| `{tests/path/to/test_file.py|.java}` | Crear / Modificar | {Estrategia de verificación unitaria REQ-NEG-01} |
+| Ruta de Archivo | Capa / Módulo | Tipo de Acción | Justificación Técnica (Vínculo EARS) |
+| :--- | :--- | :--- | :--- |
+| `{src/.../domain/model/Entity.java}` | Dominio | Crear | {Modelo puro de negocio REQ-STA-01} |
+| `{src/.../application/port/in/UseCase.java}` | Puerto Entrada | Crear | {Contrato de caso de uso REQ-EVT-01} |
+| `{src/.../application/service/AppService.java}` | Aplicación | Crear | {Orquestador de lógica de aplicación REQ-EVT-01} |
+| `{src/.../infrastructure/adapter/...}` | Adaptador | Crear / Modificar | {Adaptador web o persistencia SQL/Redis REQ-UBI-02} |
+| `{tests/...}` | Pruebas | Crear / Modificar | {Estrategia de verificación unitaria / integración} |
 
 ---
 

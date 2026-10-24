@@ -118,12 +118,22 @@ Utilizar la plantilla `.github/skills/sdlc-automation/templates/requerimientos.m
 ### Paso 2.2 — Generación de `.docs/diseño.md`
 Analizar el `#codebase` y utilizar la plantilla `.github/skills/sdlc-automation/templates/diseño.md`:
 1. Elaborar diagrama de arquitectura de componentes en sintaxis Mermaid.
-2. Definir la lista precisa de archivos Python o Java a modificar y archivos nuevos a crear.
-3. Especificar esquemas de datos, DTOs (Pydantic / POJOs), entidades SQL y contratos de interfaces/funciones.
-4. Documentar decisiones de arquitectura clave (ADRs) con alternativas descartadas.
-5. Diseñar la estrategia de pruebas (unitarias, integración, casos límite con pytest o JUnit 5).
-6. Evaluar vectores de seguridad conforme a `references/quality-checklist.md`.
-7. Diseñar el diagrama de secuencia Mermaid para el flujo principal.
+2. **Arquitectura Obligatoria para Java (Hexagonal / Ports & Adapters):**
+   - `domain/model/`: Entidades y Value Objects puros (POJOs/Records sin anotaciones Spring/JPA).
+   - `domain/exception/`: Excepciones de reglas de negocio independientes del protocolo HTTP.
+   - `application/port/in/`: Puertos primarios/driving (casos de uso) y comandos/resultados.
+   - `application/port/out/`: Puertos secundarios/driven (interfaces para caché, base de datos SQL, clientes remotos).
+   - `application/service/`: Servicios de aplicación que implementan los casos de uso orquestando el dominio y los puertos.
+   - `infrastructure/adapter/in/web/`: Adaptadores HTTP/REST (controllers, DTOs, mappers, exception handlers).
+   - `infrastructure/adapter/out/persistence/`: Adaptadores JPA/SQL que implementan los puertos de salida.
+   - `infrastructure/adapter/out/cache/`: Adaptadores Redis u otros sistemas de almacenamiento volátil.
+   - `infrastructure/config/`: Clases de configuración Spring para cableado e inyección de dependencias.
+3. Definir la lista precisa de archivos Python o Java a modificar y archivos nuevos a crear.
+4. Especificar esquemas de datos, DTOs (Pydantic / POJOs), entidades SQL y contratos de interfaces/funciones.
+5. Documentar decisiones de arquitectura clave (ADRs) con alternativas descartadas.
+6. Diseñar la estrategia de pruebas (unitarias, integración, casos límite con pytest o JUnit 5).
+7. Evaluar vectores de seguridad conforme a `references/quality-checklist.md`.
+8. Diseñar el diagrama de secuencia Mermaid para el flujo principal.
 
 ### 🚪 COMPUERTA HUMANA 2 (Gate 2: Aprobación de Especificaciones)
 Presentar ambos documentos al desarrollador:
@@ -143,7 +153,8 @@ Presentar ambos documentos al desarrollador:
 
 ### Paso 3.1 — Escritura de Código Modular (Python / Java)
 1. Modificar y crear los archivos definidos en `.docs/diseño.md`.
-2. Incluir en la cabecera de cada archivo afectado el comentario de trazabilidad:
+2. En Java, garantizar el aislamiento estricto de la capa de dominio: las clases en `domain/` y `application/` no deben acoplarse ni importar frameworks (`org.springframework.*`, `jakarta.persistence.*`).
+3. Incluir en la cabecera de cada archivo afectado el comentario de trazabilidad:
    - En Python:
      ```python
      # Rally: {FormattedID} — Requisito EARS: {ID_REQUISITO}
@@ -152,8 +163,8 @@ Presentar ambos documentos al desarrollador:
      ```java
      // Rally: {FormattedID} — Requisito EARS: {ID_REQUISITO}
      ```
-3. Seguir estrictamente los principios SOLID y las directrices de `references/quality-checklist.md`.
-4. Respetar el estilo y patrones existentes en el repositorio sin introducir dependencias redundantes.
+4. Seguir estrictamente los principios SOLID y las directrices de `references/quality-checklist.md`.
+5. Respetar el estilo y patrones existentes en el repositorio sin introducir dependencias redundantes.
 
 ### Paso 3.2 — Ejecución de Pruebas y Bucle de Auto-Sanación (Self-Healing Loop)
 Ejecutar el comando de test correspondiente al stack detectado vía `#terminal`:
