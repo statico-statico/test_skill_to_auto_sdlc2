@@ -57,11 +57,15 @@ When triggered with a Rally FormattedID (e.g., `US10293`, `DE4512`):
   - Transform every acceptance criterion into formal **EARS Notation** (`CUANDO`, `MIENTRAS`, `SI`, `DONDE`, `EL SISTEMA DEBERÁ`).
   - Document Non-Functional Requirements (NFR) and Out of Scope boundaries.
 - Generate `.docs/diseño.md` using `.github/skills/sdlc-automation/templates/diseño.md`:
-  - Mermaid architecture diagram of affected modules. For Java projects, strictly enforce **Hexagonal Architecture (Ports and Adapters)**:
-    - Pure `domain/` models and exceptions without framework or Spring dependencies.
-    - Inbound and Outbound ports under `application/port/`.
-    - Application services under `application/service/`.
-    - Primary and secondary adapters under `infrastructure/adapter/`.
+  - Mermaid architecture diagram of affected modules:
+    - **Java:** Strictly enforce **Hexagonal Architecture (Ports and Adapters)**:
+      - Pure `domain/` models and exceptions without framework or Spring dependencies.
+      - Inbound and Outbound ports under `application/port/`.
+      - Application services under `application/service/`.
+      - Primary and secondary adapters under `infrastructure/adapter/`.
+    - **Python:** **DO NOT force Hexagonal Architecture**. Apply the architectural heuristic:
+      - **Use if:** The project has a complex and frequently changing business domain, or when implementing the core domain of the application.
+      - **Don't use if:** The project or module has a CRUD-like complexity — in such a scenario, there will be no benefits of hexagonal architecture, and it will be overengineering. Use standard modular layered architecture (`routers/`, `services/`, `models/schemas`, `repositories/db`).
   - Complete inventory of files to modify and create (Python or Java).
   - Interface contracts, data models (SQL entities / DTOs), and ADRs (Architecture Decision Records).
   - Test strategy and OWASP security considerations.

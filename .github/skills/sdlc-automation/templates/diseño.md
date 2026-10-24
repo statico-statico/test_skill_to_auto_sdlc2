@@ -11,7 +11,6 @@
 ## 1. Diagrama de Arquitectura de Componentes
 
 > **Directriz de Patrón Arquitectónico:**
-> - **En Python:** Capas modulares / Clean Architecture (`routers/`, `services/`, `models/`, `repositories/`).
 > - **En Java:** **Arquitectura Hexagonal Obligatoria (Ports & Adapters)**:
 >   - `domain/`: Modelos, Value Objects y excepciones de negocio puros en Java (sin dependencias de frameworks ni Spring).
 >   - `application/port/in/`: Puertos de entrada (casos de uso) y DTOs de comando/resultado.
@@ -19,8 +18,31 @@
 >   - `application/service/`: Implementación de casos de uso orquestando el dominio y los puertos.
 >   - `infrastructure/adapter/in/`: Adaptadores primarios (ej. REST Controllers, Web MVC).
 >   - `infrastructure/adapter/out/`: Adaptadores secundarios (ej. JPA Repositories para SQL, Redis Cache).
+> - **En Python:** **NO forzar Arquitectura Hexagonal**. Aplicar la siguiente heurística:
+>   - **Cuándo usar (Use if):**
+>     - El proyecto tiene un dominio de negocio complejo y frecuentemente cambiante.
+>     - Es necesario implementar el núcleo de dominio (*core domain*) de la aplicación.
+>   - **Cuándo NO usar (Don't use if):**
+>     - El proyecto o módulo tiene complejidad de tipo CRUD — en dicho escenario no habrá ningún beneficio de la arquitectura hexagonal y representará sobreingeniería (*overengineering*).
+>     - En aplicaciones CRUD o APIs REST convencionales, utilizar la arquitectura modular estándar por capas (`routers/` -> `services/` -> `models/schemas` -> `repositories/db`).
 
-### Diagrama General (Python) o Hexagonal (Java)
+### Opción A: Diagrama Modular por Capas (Estándar en Python / CRUD)
+```mermaid
+graph TD
+    subgraph "Capa de Presentación / API"
+        R["{Router_O_Controller}"] --> S["{Service_Layer}"]
+    end
+
+    subgraph "Capa de Dominio y Negocio"
+        S --> M["{Schemas_Pydantic_O_Modelos}"]
+    end
+
+    subgraph "Capa de Persistencia e Infraestructura"
+        S --> DB[("Base de Datos SQL / Cache Redis")]
+    end
+```
+
+### Opción B: Diagrama Hexagonal / Puertos y Adaptadores (Obligatorio en Java / Núcleo Complejo)
 ```mermaid
 graph TD
     subgraph "Adaptadores Primarios / Driving (Entrada)"
@@ -29,7 +51,7 @@ graph TD
 
     subgraph "Hexágono de Dominio y Aplicación"
         B --> C["{Application_Service}"]
-        C --> D["{Domain_Model_Pure_Java_O_Python}"]
+        C --> D["{Domain_Model_Pure}"]
         C --> E["{Outbound_Port_Interface}"]
     end
 

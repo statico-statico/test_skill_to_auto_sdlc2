@@ -128,12 +128,19 @@ Analizar el `#codebase` y utilizar la plantilla `.github/skills/sdlc-automation/
    - `infrastructure/adapter/out/persistence/`: Adaptadores JPA/SQL que implementan los puertos de salida.
    - `infrastructure/adapter/out/cache/`: Adaptadores Redis u otros sistemas de almacenamiento volátil.
    - `infrastructure/config/`: Clases de configuración Spring para cableado e inyección de dependencias.
-3. Definir la lista precisa de archivos Python o Java a modificar y archivos nuevos a crear.
-4. Especificar esquemas de datos, DTOs (Pydantic / POJOs), entidades SQL y contratos de interfaces/funciones.
-5. Documentar decisiones de arquitectura clave (ADRs) con alternativas descartadas.
-6. Diseñar la estrategia de pruebas (unitarias, integración, casos límite con pytest o JUnit 5).
-7. Evaluar vectores de seguridad conforme a `references/quality-checklist.md`.
-8. Diseñar el diagrama de secuencia Mermaid para el flujo principal.
+3. **Heurística Arquitectónica para Python (NO forzar Hexagonal):**
+   - **Usar Hexagonal si:**
+     - El proyecto tiene un dominio de negocio complejo y frecuentemente cambiante.
+     - Se necesita implementar el núcleo de dominio (*core domain*) de la aplicación aislado de dependencias.
+   - **NO usar Hexagonal si:**
+     - El proyecto o módulo tiene complejidad de tipo CRUD — en dicho escenario no hay beneficios de la arquitectura hexagonal y resultará en sobreingeniería (*overengineering*).
+     - En servicios estándar o tipo CRUD en Python, preferir la arquitectura modular por capas (`routers/`, `services/`, `models/schemas`, `repositories/db`).
+4. Definir la lista precisa de archivos Python o Java a modificar y archivos nuevos a crear.
+5. Especificar esquemas de datos, DTOs (Pydantic / POJOs), entidades SQL y contratos de interfaces/funciones.
+6. Documentar decisiones de arquitectura clave (ADRs) con alternativas descartadas.
+7. Diseñar la estrategia de pruebas (unitarias, integración, casos límite con pytest o JUnit 5).
+8. Evaluar vectores de seguridad conforme a `references/quality-checklist.md`.
+9. Diseñar el diagrama de secuencia Mermaid para el flujo principal.
 
 ### 🚪 COMPUERTA HUMANA 2 (Gate 2: Aprobación de Especificaciones)
 Presentar ambos documentos al desarrollador:
