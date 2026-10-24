@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-configuration.json",
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "rally_pat",
+      "description": "Token de Acceso Personal (PAT / API Key) para Broadcom Rally WSAPI",
+      "password": true
+    }
+  ],
+  "servers": {
+    "rally-mcp": {
+      "type": "http",
+      "url": "https://mcp.rallydev.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:rally_pat}"
+      }
+    }
+  }
+}

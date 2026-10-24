@@ -1,81 +1,69 @@
-# Checklist de Calidad — SDLC Automation Agent
+# Checklist de Calidad y Seguridad — SDLC Automation Agent (Python / Java)
 
-## Principios SOLID
-- [ ] **S** — Single Responsibility: Cada clase/módulo tiene una sola razón para cambiar
-- [ ] **O** — Open/Closed: Extendible sin modificar código existente
-- [ ] **L** — Liskov Substitution: Subtipos sustituibles por sus bases
-- [ ] **I** — Interface Segregation: Interfaces pequeñas y enfocadas
-- [ ] **D** — Dependency Inversion: Depender de abstracciones, no de implementaciones
+Este checklist define los criterios obligatorios que el agente y los revisores humanos deben verificar antes de aprobar la transición hacia Git y Merge Request en proyectos **Python** y **Java**. Se refleja directamente en la sección 3 del archivo `.docs/report.md`.
 
-## Seguridad (OWASP Top 10)
-- [ ] A01 — Broken Access Control: Permisos verificados en cada operación
-- [ ] A02 — Cryptographic Failures: Datos sensibles cifrados
-- [ ] A03 — Injection: Inputs sanitizados, queries parametrizadas
-- [ ] A04 — Insecure Design: Patrones seguros desde el diseño
-- [ ] A05 — Security Misconfiguration: No credenciales por defecto
-- [ ] A06 — Vulnerable Components: Dependencias actualizadas
-- [ ] A07 — Auth Failures: Tokens y sesiones gestionados correctamente
-- [ ] A08 — Data Integrity: Validación de datos en entrada y salida
-- [ ] A09 — Logging Failures: Eventos de seguridad registrados
-- [ ] A10 — SSRF: Requests externos validados y restringidos
+---
 
-## Código
-- [ ] Sin credenciales hardcodeadas
-- [ ] Manejo de errores en todas las llamadas externas
-- [ ] Logging con niveles adecuados (ERROR, WARN, INFO)
-- [ ] Tests cubren happy path + edge cases + error cases
-- [ ] Código sigue convenciones existentes del proyecto
-- [ ] No hay código muerto o comentado sin razón
-- [ ] Imports ordenados y sin duplicados
+## 1. Principios SOLID de Diseño de Software
 
-## Documentación
-- [ ] Comentarios de trazabilidad Rally en cada archivo modificado
-- [ ] Docstrings/JSDoc en funciones públicas
-- [ ] README actualizado si se añaden nuevas features o dependencias
-- [ ] CHANGELOG actualizado si el proyecto lo usa
+- [ ] **S — Single Responsibility Principle (SRP):** Cada clase, función o módulo tiene una única responsabilidad y una única razón para cambiar. Los controladores/routers no contienen lógica de negocio; las entidades no ejecutan persistencia directa.
+- [ ] **O — Open/Closed Principle (OCP):** El código está abierto a la extensión pero cerrado a la modificación directa. Se emplean patrones como Strategy, decoradores en Python o interfaces/inyección en Java para añadir nuevos comportamientos sin alterar código probado.
+- [ ] **L — Liskov Substitution Principle (LSP):** Cualquier clase derivada puede sustituir a su clase base sin alterar la correctitud del programa. No se lanzan excepciones inesperadas en subtipos.
+- [ ] **I — Interface Segregation Principle (ISP):** Las interfaces (o Protocolos/Abstract Classes en Python) son pequeñas, cohesivas y orientadas al cliente. Ningún componente está obligado a implementar métodos que no utiliza.
+- [ ] **D — Dependency Inversion Principle (DIP):** Los módulos de alto nivel dependen de abstracciones (interfaces o protocolos), nunca de implementaciones concretas. Se utiliza inyección de dependencias (FastAPI `Depends`, Spring `@Autowired` / inyección por constructor).
 
-## Testing
-- [ ] Tests unitarios para cada función nueva
-- [ ] Tests de integración para flujos end-to-end
-- [ ] Edge cases cubiertos (null, vacío, límites, concurrencia)
-- [ ] Mocking apropiado de dependencias externas
-- [ ] Tests ejecutan en < 30 segundos (unitarios)
+---
 
-## Performance
-- [ ] No hay queries N+1 o loops ineficientes
-- [ ] Datos grandes paginados o limitados
-- [ ] Cache utilizado donde sea apropiado
-- [ ] Operaciones de I/O son asíncronas cuando corresponde
+## 2. Evaluación de Seguridad — OWASP Top 10
 
-## Git & CI/CD
-- [ ] Commits siguen Conventional Commits (`feat:`, `fix:`, `chore:`)
-- [ ] Branch sigue convención del proyecto
-- [ ] MR creado como Draft
-- [ ] No se incluyen archivos generados o temporales en el commit
-- [ ] `.gitignore` actualizado si se añaden nuevos tipos de archivos generados
+| ID OWASP | Categoría de Vulnerabilidad | Criterio de Verificación del Agente |
+| :--- | :--- | :--- |
+| **A01:2021** | **Broken Access Control** | Todas las operaciones verifican permisos de usuario/rol en el backend. No se confía en la protección del cliente ni en identificadores numéricos manipulables. |
+| **A02:2021** | **Cryptographic Failures** | No hay secretos en texto claro. Se emplean algoritmos criptográficos robustos (AES-256-GCM, SHA-256, bcrypt/Argon2 para contraseñas, PyJWT / Nimbus JOSE para JWT). |
+| **A03:2021** | **Injection** | Consultas SQL parametrizadas o a través de ORM seguro (SQLAlchemy, Spring Data JPA / Hibernate). Ninguna entrada de usuario se concatena directamente en sentencias SQL ni comandos del sistema operativo. |
+| **A04:2021** | **Insecure Design** | Se implementan límites de tasa (rate limiting), validación de esquemas (Pydantic en Python, Bean Validation / Hibernate Validator en Java) y controles de flujo de negocio seguros. |
+| **A05:2021** | **Security Misconfiguration** | Modo debug desactivado en producción (`DEBUG=False` o `spring.profiles.active=prod`). Encabezados de seguridad HTTP configurados. Sin credenciales por defecto. |
+| **A06:2021** | **Vulnerable & Outdated Components** | Todas las dependencias añadidas a `pyproject.toml`, `requirements.txt`, `pom.xml` o `build.gradle` provienen de fuentes oficiales y en versiones estables sin vulnerabilidades conocidas (`pip-audit`, `dependency-check`). |
+| **A07:2021** | **Identification & Authentication Failures** | Tokens de sesión con expiración estricta y firma criptográfica verificada. Protección contra ataques de fuerza bruta y revocación activa en cache/Redis. |
+| **A08:2021** | **Software & Data Integrity Failures** | Deserialización segura. Verificación de integridad y validación de tipos estricta en payloads entrantes. |
+| **A09:2021** | **Security Logging & Monitoring Failures** | Se registran eventos clave de seguridad (fallos de autenticación, revocaciones de sesión, accesos no autorizados) con timestamps UTC en logs estructurados (JSON), sin registrar datos sensibles (PII/contraseñas). |
+| **A10:2021** | **Server-Side Request Forgery (SSRF)** | Peticiones HTTP salientes validadas contra una lista blanca de dominios permitidos. Prohibido acceso a rangos IP locales o metadata de nube (`169.254.169.254`). |
 
-## Evaluación de Seguridad para report.md
+---
 
-Usar esta tabla en el reporte de cada tarea:
+## 3. Estándares de Código y Buenas Prácticas
 
-| Categoría OWASP       | Estado   | Criterio de Verificación                              |
-|:-----------------------|:---------|:------------------------------------------------------|
-| A01 — Access Control   | ✅/⚠️/❌ | ¿Se verifican permisos en cada operación sensible?     |
-| A02 — Crypto Failures  | ✅/⚠️/❌ | ¿Se cifran datos sensibles en tránsito y reposo?       |
-| A03 — Injection        | ✅/⚠️/❌ | ¿Se sanitizan inputs y se usan queries parametrizadas? |
-| A04 — Insecure Design  | ✅/⚠️/❌ | ¿Se aplicaron patrones de diseño seguros?              |
-| A05 — Misconfiguration | ✅/⚠️/❌ | ¿No hay credenciales por defecto ni configs inseguras? |
-| A06 — Vulnerable Deps  | ✅/⚠️/❌ | ¿Las dependencias están actualizadas?                  |
-| A07 — Auth Failures    | ✅/⚠️/❌ | ¿Se gestionan tokens y sesiones correctamente?         |
-| A08 — Data Integrity   | ✅/⚠️/❌ | ¿Se validan datos en entrada y salida?                 |
-| A09 — Logging Failures | ✅/⚠️/❌ | ¿Se registran eventos de seguridad?                    |
-| A10 — SSRF             | ✅/⚠️/❌ | ¿Se validan y restringen requests externos?            |
+### 3.1 Higiene del Código y Trazabilidad
+- [ ] **Sin Secretos Hardcodeados:** Ninguna clave API, contraseña, token o URI de infraestructura privada está inscrita en el código fuente. Se leen desde variables de entorno (`os.getenv`, `pydantic-settings` o `@Value` / `application.yml`).
+- [ ] **Trazabilidad Rally Inline:** Cada archivo creado o sustancialmente modificado incluye un comentario inicial vinculante:
+  ```python
+  # Python:
+  # Rally: US10293 — Requisito EARS: REQ-001 (Validación de sesión)
+  ```
+  ```java
+  // Java:
+  // Rally: US10293 — Requisito EARS: REQ-001 (Validación de sesión)
+  ```
+- [ ] **DRY (Don't Repeat Yourself):** No existe duplicación innecesaria de lógica. Los cálculos y transformaciones comunes residen en módulos utilitarios o servicios compartidos.
+- [ ] **Imports Limpios:** Sin imports no utilizados, circulares o con comodines (`from module import *`, `import java.util.*`).
+- [ ] **Manejo Defensivo de Errores:** Todas las llamadas a I/O, base de datos SQL, APIs de red o parsing de datos están envueltas en bloques de control (`try/except` en Python, `try/catch` en Java) con excepciones personalizadas tipadas.
 
-### Leyenda de Estados
+### 3.2 Logging y Diagnóstico
+- [ ] Niveles de log respetados:
+  - `ERROR`: Fallos no recuperables que requieren atención inmediata.
+  - `WARN`: Condiciones anómalas recuperables o advertencias de rendimiento.
+  - `INFO`: Hitos significativos del flujo de negocio.
+  - `DEBUG`: Información de diagnóstico detallada (desactivada en producción).
+- [ ] Logs estructurados (formato JSON estándar).
 
-| Estado | Significado |
-|:-------|:------------|
-| ✅     | Verificado y conforme |
-| ⚠️     | Parcialmente conforme o no aplica completamente |
-| ❌     | No conforme — requiere acción |
-| N/A    | No aplica para este cambio |
+---
+
+## 4. Estándares de Pruebas Automatizadas (Python / Java)
+
+| Métrica / Tipo de Prueba | Umbral Mínimo Requerido | Herramienta Python | Herramienta Java |
+| :--- | :--- | :--- | :--- |
+| **Tasa de Aprobación** | **100%** de los tests deben pasar | `pytest` | `mvn test` / `./gradlew test` |
+| **Cobertura de Código** | **≥ 80%** en líneas y ramas | `pytest-cov` | JaCoCo |
+| **Happy Path Tests** | Al menos 1 por cada criterio EARS nominal | Test de endpoint / servicio | `@Test` JUnit 5 |
+| **Negative Tests (Edge Cases)** | Al menos 2 por cada criterio negativo EARS | `pytest.raises(HTTPException)` | `assertThrows(...)` |
+| **Pruebas de Integración** | Mínimo 1 test de extremo a extremo | `httpx.AsyncClient` + DB | `@SpringBootTest` + `@AutoConfigureMockMvc` |

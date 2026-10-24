@@ -2,229 +2,236 @@
 name: sdlc-automation
 description: >
   End-to-end SDLC automation skill that transforms Rally issues into
-  GitLab Merge Requests. Generates spec-driven documentation (requerimientos.md,
-  diseño.md), implements code changes, executes tests, manages git workflows
-  with glab CLI, and maintains bidirectional traceability between Rally and GitLab.
+  GitLab Merge Requests for Python and Java projects. Generates spec-driven documentation
+  (requerimientos.md, diseño.md), implements code changes, executes tests (pytest/mvn/gradle),
+  manages git workflows with glab CLI, and maintains bidirectional traceability between Rally and GitLab.
   Activate when user mentions Rally IDs like US12345, DE6789, or asks to
   "automate SDLC", "issue to PR", "rally to merge request".
 license: proprietary
 compatibility: >
   Requires glab CLI authenticated, Rally MCP server configured in
-  .vscode/mcp.json, git initialized repository.
+  .vscode/mcp.json, git initialized repository, Python 3.10+ or Java 17+.
 allowed-tools: terminal codebase editFiles fetch mcp:rally-mcp
 metadata:
   author: engineering-team
   version: "1.0.0"
   methodology: spec-driven-development
+  supported-stacks: "Python, Java"
 ---
 
-# SDLC Automation Skill — Operational Procedures
+# SDLC Automation Skill — Procedimientos Operativos Estandarizados (SOP)
 
-## Trigger Conditions
-Activate this skill when:
-- User provides a Rally FormattedID (pattern: `US\d+` or `DE\d+`)
-- User asks to "automate", "implement", "develop" a Rally issue
-- User mentions "issue to MR", "issue to PR", "rally to gitlab"
-
-## Phase 1: Rally Issue Ingestion
-
-### Step 1.1 — Query Rally via MCP
-Use the `rally_openapi_search_tools` to find the correct WSAPI operation for
-reading a HierarchicalRequirement or Defect.
-
-Then use `rally_openapi_invoke_tool` to execute:
-```
-GET hierarchicalrequirement
-  query: (FormattedID = "{ID}")
-  fetch: FormattedID,Name,Description,AcceptanceCriteria,Notes,ScheduleState,
-         Owner,Iteration,Project,Tags
-```
-
-### Step 1.2 — Validate State
-```
-IF ScheduleState == "Accepted":
-  → ABORT: "Issue {ID} is already Accepted. Cannot modify accepted artifacts."
-IF ScheduleState == "Completed":
-  → WARN user and ask if they want to proceed
-IF ScheduleState == "Defined":
-  → Update ScheduleState to "In-Progress" via rally_openapi_invoke_tool
-```
-
-### Step 1.3 — Extract & Structure Context
-Parse the following from Rally response:
-- `title` ← Name
-- `description` ← Description (strip HTML tags if present)
-- `acceptance_criteria` ← AcceptanceCriteria (parse into discrete testable items)
-- `notes` ← Notes (supplementary context)
-- `iteration` ← Iteration.Name (for branch naming)
-
-**🚪 GATE 1**: Present extracted context to user:
-"I've extracted the following from Rally {ID}:
-- Title: {title}
-- {N} acceptance criteria identified
-- Current state: {state} → transitioning to In-Progress
-Does this look correct?"
+Este skill define la secuencia de operaciones autónomas que el orquestador ejecuta para transformar una historia de usuario o defecto de Broadcom Rally en un Merge Request verificado en GitLab para proyectos **Python** y **Java**, garantizando compuertas humanas en cada transición de fase.
 
 ---
 
-## Phase 2: Specification Generation
+## 0. Condiciones de Activación (Trigger Conditions)
 
-### Step 2.1 — Detect Project Stack
-Run the stack detection script via terminal:
-```bash
-# On Windows
-.github/skills/sdlc-automation/scripts/detect-stack.bat
-
-# On Unix/Mac
-bash .github/skills/sdlc-automation/scripts/detect-stack.sh
-```
-
-### Step 2.2 — Generate requerimientos.md
-Create file `.docs/requerimientos.md` using the template at
-`templates/requerimientos.md`. Fill with:
-
-1. **Header**: Rally ID, title, iteration
-2. **User Story**: Reformulate from Description field
-3. **Acceptance Criteria**: Convert each criterion to EARS notation
-   (reference `references/ears-notation.md` for syntax)
-   - Use CUANDO/EL SISTEMA DEBERÁ for event-triggered requirements
-   - Use MIENTRAS for state-based requirements
-   - Use SI for error/negative requirements
-4. **Non-Functional Requirements**: Infer from context (performance, security)
-5. **Out of Scope**: Explicitly state what this issue does NOT cover
-6. **Open Questions**: Flag any ambiguities found in the Rally issue
-
-### Step 2.3 — Generate diseño.md
-Analyze the existing codebase via `#codebase` to understand:
-- Project architecture patterns
-- Existing conventions (naming, structure, dependency injection)
-- Related components that will be affected
-
-Create file `.docs/diseño.md` using the template at
-`templates/diseño.md`. Include:
-
-1. **Architecture diagram** (Mermaid) showing affected components
-2. **Files to modify**: Exact paths with rationale
-3. **New files to create**: With proposed content structure
-4. **Data model changes**: If applicable
-5. **Interface contracts**: New or modified APIs/functions
-6. **Design decisions**: With alternatives considered
-7. **Test strategy**: What tests to write and expected coverage
-8. **Security considerations**: Input validation, auth, data protection
-
-### Step 2.4 — Review Gate
-**🚪 GATE 2**: Present both documents for human review.
-"I've generated the specification documents:
-- `.docs/requerimientos.md` — {N} requirements, {M} EARS criteria
-- `.docs/diseño.md` — {P} files to modify, {Q} new files
-
-Please review and approve before I proceed to implementation."
-
-Options:
-- ✅ Approved — proceed to implementation
-- ⚠️ Needs adjustments — specify what to change
-- ❌ Rejected — regenerate with corrections
-
-**DO NOT proceed to Phase 3 without explicit approval.**
+Activar este skill cuando ocurra cualquiera de las siguientes condiciones:
+1. El usuario mencione un identificador con formato de Rally: `US\d+` (Historia de Usuario) o `DE\d+` (Defecto).
+2. El usuario solicite: *"automatiza este issue"*, *"de issue a PR"*, *"crea el MR para US..."*, o *"desarrolla la historia US..."*.
+3. El agente orquestador `@sdlc-orchestrator` sea invocado con un identificador de tarea ágil.
 
 ---
 
-## Phase 3: Implementation & Testing
+## Fase 0: Descubrimiento de Contexto y Detección de Stack (Python / Java)
 
-### Step 3.1 — Implement Code
-Following the approved `diseño.md`:
-1. Create/modify files in the order specified
-2. Add traceability comments in each file:
+Antes de realizar cambios, el agente debe analizar el repositorio local para identificar el ecosistema tecnológico:
+
+### Paso 0.1 — Detección Automática de Stack Tecnológico
+Ejecutar el script utilitario `.github/skills/sdlc-automation/scripts/detect-stack.sh` (o `detect-stack.bat` en Windows) o evaluar la existencia de archivos indicadores:
+- `pyproject.toml` / `requirements.txt` / `Pipfile` / `setup.py` → Ecosistema **Python**
+  - Gestores soportados: Poetry, Pipenv, pip / venv.
+  - Test runner: `pytest` / `poetry run pytest` / `python -m unittest discover`.
+  - Linter / formateo: `ruff`, `black`, `flake8`.
+- `pom.xml` → Ecosistema **Java (Maven)**
+  - Gestor: Maven (`mvn`).
+  - Test runner: `mvn test` (JUnit 5, TestNG).
+  - Linter: `mvn checkstyle:check`, Spotless.
+- `build.gradle` / `build.gradle.kts` → Ecosistema **Java (Gradle)**
+  - Gestor: Gradle (`./gradlew` o `gradle`).
+  - Test runner: `./gradlew test` (o `gradle test`).
+  - Linter: `./gradlew check`.
+
+### Paso 0.2 — Inspección de Convenciones del Repositorio
+Mediante `#codebase`, identificar:
+- Estructura de carpetas (`src/`, `tests/` o `src/main/java`, `src/test/java`).
+- Estilo de tipado y formateo (type hints en Python, checkstyle en Java).
+- Modelos de datos y capas de persistencia (SQLAlchemy, SQL / JPA / Hibernate).
+- Patrones arquitectónicos predominantes (Clean Architecture, Hexagonal, MVC / Service Layer).
+
+---
+
+## Fase 1: Ingesta y Validación de Contexto desde Broadcom Rally
+
+### Paso 1.1 — Consulta a Rally mediante Rally MCP
+Utilizar las herramientas provistas por el servidor MCP `rally-mcp`:
+1. Localizar la operación WSAPI mediante `rally_openapi_search_tools` para `HierarchicalRequirement` o `Defect`.
+2. Invocar la herramienta con una consulta superficial (*Shallow Fetch*):
+   ```text
+   GET hierarchicalrequirement
+     query: (FormattedID = "{ID}")
+     fetch: FormattedID,ObjectID,Name,Description,AcceptanceCriteria,Notes,ScheduleState,Owner,Iteration,Project,Tags
    ```
-   // Rally: {FormattedID} — {requirement reference}
-   ```
-3. Follow existing code conventions detected in Phase 2
 
-### Step 3.2 — Run Tests (Self-Healing Loop)
-Detect and execute the project's test command:
-```
-nodejs  → npm test / npx jest / npx vitest
-python  → pytest / python -m pytest
-dotnet  → dotnet test
-java    → mvn test / gradle test
-golang  → go test ./...
-```
+### Paso 1.2 — Validación de Máquina de Estados (`ScheduleState`)
+Evaluar el campo devuelto según las reglas de `references/rally-fields-map.md`:
+- Si `ScheduleState == "Accepted"`:
+  🛑 **ABORTAR INMEDIATAMENTE**: Informar al usuario que el requerimiento ya fue aceptado formalmente y es inmutable.
+- Si `ScheduleState == "Completed"`:
+  ⚠️ **ADVERTIR AL USUARIO**: Informar que la historia ya figuraba como completada y solicitar confirmación para reprocesarla.
+- Si `ScheduleState == "Defined"`:
+  ✅ **PROMOVER ESTADO**: Invocar `rally_openapi_invoke_tool` para actualizar `ScheduleState` a `"In-Progress"`.
+- Si `ScheduleState == "In-Progress"`:
+  ✅ **CONTINUAR**: Mantener el estado actual y proceder.
 
-**Self-healing protocol:**
-```
-iteration = 0
-MAX_ITERATIONS = 3
+### Paso 1.3 — Depuración y Normalización de Textos
+- Limpiar el contenido HTML de `Description` y `AcceptanceCriteria` aplicando las reglas de `references/rally-fields-map.md`.
+- Desglosar los criterios de aceptación en afirmaciones verificables atómicas.
 
-WHILE tests fail AND iteration < MAX_ITERATIONS:
-  1. Read error output from terminal
-  2. Identify failing test and root cause
-  3. Apply targeted fix (do NOT rewrite entire files)
-  4. Re-run tests
-  5. iteration++
+### 🚪 COMPUERTA HUMANA 1 (Gate 1: Contexto Rally)
+Presentar al usuario el resumen del ticket para validación:
+> *"He extraído y validado los datos de Rally para {FormattedID}:*  
+> *- **Título:** {Name}*  
+> *- **Criterios de Aceptación detectados:** {N} elementos*  
+> *- **Transición de Estado:** {Estado_Anterior} ➔ In-Progress*  
+> *¿Confirmas que el alcance es correcto para proceder a la fase de especificación?"*
 
-IF iteration == MAX_ITERATIONS AND tests still fail:
-  → STOP and report to user with full error context
-```
-
-### Step 3.3 — Quality Checks
-Reference `references/quality-checklist.md` and verify:
-- [ ] No hardcoded credentials or secrets
-- [ ] Input validation on all new user inputs
-- [ ] Error handling for external calls
-- [ ] Logging for important operations
-- [ ] Code follows existing project conventions
-
-### Step 3.4 — Implementation Review Gate
-**🚪 GATE 3**: Present implementation summary.
-"Implementation complete for {FormattedID}:
-- {N} files modified, {M} files created
-- Tests: {PASS/FAIL} ({X}/{Y} passing)
-- Quality checklist: {status}
-
-Ready to proceed with git workflow and MR creation?"
+**DETENERSE** y esperar aprobación explícita del usuario.
 
 ---
 
-## Phase 4: Git Workflow & Merge Request
+## Fase 2: Generación de Especificaciones Técnicas (Spec-Driven)
 
-### Step 4.1 — Git Branch & Commit
-Execute via `#terminal`:
+### Paso 2.1 — Generación de `.docs/requerimientos.md`
+Utilizar la plantilla `.github/skills/sdlc-automation/templates/requerimientos.md`:
+1. Formular la Historia de Usuario en formato ágil (`Como... Quiero... Para...`).
+2. Traducir cada criterio de aceptación a **Notación EARS** obligatoria (consultar `references/ears-notation.md`):
+   - Requisitos de Evento: `CUANDO..., EL SISTEMA DEBERÁ...`
+   - Requisitos de Estado: `MIENTRAS..., EL SISTEMA DEBERÁ...`
+   - Requisitos de Error / Negativos: `SI..., EL SISTEMA DEBERÁ...`
+   - Requisitos Opcionales: `DONDE..., EL SISTEMA DEBERÁ...`
+   - Requisitos Ubicuos: `EL SISTEMA DEBERÁ...`
+3. Documentar Requisitos No Funcionales (Rendimiento, Seguridad, Disponibilidad).
+4. Delimitar explícitamente lo que queda Fuera de Alcance (*Out of Scope*).
+
+### Paso 2.2 — Generación de `.docs/diseño.md`
+Analizar el `#codebase` y utilizar la plantilla `.github/skills/sdlc-automation/templates/diseño.md`:
+1. Elaborar diagrama de arquitectura de componentes en sintaxis Mermaid.
+2. Definir la lista precisa de archivos Python o Java a modificar y archivos nuevos a crear.
+3. Especificar esquemas de datos, DTOs (Pydantic / POJOs), entidades SQL y contratos de interfaces/funciones.
+4. Documentar decisiones de arquitectura clave (ADRs) con alternativas descartadas.
+5. Diseñar la estrategia de pruebas (unitarias, integración, casos límite con pytest o JUnit 5).
+6. Evaluar vectores de seguridad conforme a `references/quality-checklist.md`.
+7. Diseñar el diagrama de secuencia Mermaid para el flujo principal.
+
+### 🚪 COMPUERTA HUMANA 2 (Gate 2: Aprobación de Especificaciones)
+Presentar ambos documentos al desarrollador:
+> *"He generado las especificaciones técnicas en el directorio `.docs/`:*  
+> *- `.docs/requerimientos.md` ({N} requisitos EARS formulados).*  
+> *- `.docs/diseño.md` (Diagramas Mermaid, {M} archivos impactados).*  
+> *Por favor, revisa y aprueba el diseño técnico antes de iniciar la escritura de código."*
+
+**Opciones del usuario:**
+- ✅ **Aprobado:** Continuar a la Fase 3.
+- ⚠️ **Ajustes:** Modificar las secciones señaladas por el usuario y volver a presentar.
+- ❌ **Rechazado:** Detener el flujo.
+
+---
+
+## Fase 3: Implementación de Código y Ciclo de Auto-Sanación
+
+### Paso 3.1 — Escritura de Código Modular (Python / Java)
+1. Modificar y crear los archivos definidos en `.docs/diseño.md`.
+2. Incluir en la cabecera de cada archivo afectado el comentario de trazabilidad:
+   - En Python:
+     ```python
+     # Rally: {FormattedID} — Requisito EARS: {ID_REQUISITO}
+     ```
+   - En Java:
+     ```java
+     // Rally: {FormattedID} — Requisito EARS: {ID_REQUISITO}
+     ```
+3. Seguir estrictamente los principios SOLID y las directrices de `references/quality-checklist.md`.
+4. Respetar el estilo y patrones existentes en el repositorio sin introducir dependencias redundantes.
+
+### Paso 3.2 — Ejecución de Pruebas y Bucle de Auto-Sanación (Self-Healing Loop)
+Ejecutar el comando de test correspondiente al stack detectado vía `#terminal`:
+- **Python:** `pytest` (o `poetry run pytest` / `python -m unittest discover`).
+- **Java:** `mvn test` (o `./gradlew test` / `gradle test`).
+
+```text
+iteracion = 0
+MAX_ITERACIONES = 3
+
+MIENTRAS los tests fallen Y iteracion < MAX_ITERACIONES:
+  1. Capturar el volcado de error (traceback / stack trace) de la consola.
+  2. Diagnosticar la causa raíz comparando con diseño.md y el código actual.
+  3. Aplicar una corrección quirúrgica (NUNCA reescribir archivos enteros sin necesidad).
+  4. Reejecutar la suite de pruebas.
+  5. iteracion++
+
+SI iteracion == MAX_ITERACIONES Y los tests aún fallan:
+  🛑 DETENERSE y emitir un reporte detallado al usuario solicitando asistencia humana.
+```
+
+### Paso 3.3 — Verificación Estática de Calidad y OWASP
+Comprobar contra `references/quality-checklist.md`:
+- Ningún secreto ni credencial expuesta en archivos `.py`, `.java` ni ficheros de configuración (`application.yml`, `.env`).
+- Entradas sanitizadas y tipadas (OWASP A03 Injection).
+- Consultas SQL parametrizadas o mediante ORM seguro (SQLAlchemy, JPA).
+- Control de acceso validado en lógica de negocio (OWASP A01).
+- Cobertura de tests ≥ 80%.
+
+### 🚪 COMPUERTA HUMANA 3 (Gate 3: Revisión de Implementación)
+Presentar el balance técnico de los cambios:
+> *"Implementación finalizada para {FormattedID}:*  
+> *- Archivos modificados: {N} | Archivos nuevos: {M}*  
+> *- Pruebas automatizadas: ✅ {PASS_COUNT}/{TOTAL_COUNT} en verde.*  
+> *- Cobertura estimada: {COVERAGE}%.*  
+> *¿Autorizas la creación de la rama Git y el Merge Request en GitLab?"*
+
+**DETENERSE** y esperar confirmación del desarrollador.
+
+---
+
+## Fase 4: Control de Versiones y Merge Request en GitLab
+
+### Paso 4.1 — Creación de Rama y Commit Convencional
+Ejecutar mediante `#terminal`:
 ```bash
-# Create feature branch
-BRANCH_NAME="feature/{FormattedID}-$(echo '{title}' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | head -c 50)"
+# Sanitizar título y crear rama descriptiva
+BRANCH_SLUG=$(echo "{Title}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c 1-40)
+BRANCH_NAME="feature/{FormattedID}-${BRANCH_SLUG}"
 git checkout -b "$BRANCH_NAME"
 
-# Stage and commit
+# Añadir cambios y crear commit con formato semántico
 git add .
-git commit -m "feat({FormattedID}): {concise_title}
+git commit -m "feat({FormattedID}): {Title}
 
-- Implements requirements from Rally {FormattedID}
-- See .docs/requerimientos.md for full specification
-- See .docs/diseño.md for technical design
+- Implementa requerimientos aprobados de Rally {FormattedID}
+- Especificaciones: .docs/requerimientos.md
+- Diseno tecnico: .docs/diseno.md
+- Trazabilidad bidireccional Rally-GitLab
 
 Rally-Issue: {FormattedID}"
 
-# Push to remote
+# Publicar rama remota
 git push -u origin HEAD
 ```
 
-### Step 4.2 — Generate report.md
-Create `.docs/report.md` using template at `templates/report.md`.
-Reference `references/quality-checklist.md` for structure.
+### Paso 4.2 — Generación del Reporte Final (`.docs/report.md`)
+Generar `.docs/report.md` utilizando la plantilla `templates/report.md`:
+- Resumen ejecutivo del trabajo realizado.
+- Matriz de trazabilidad (Archivo ↔ Requisito EARS).
+- Checklist SOLID y evaluación de seguridad OWASP.
+- Resumen métrico de pruebas (`pytest` o JUnit) y registro de deuda técnica.
 
-Include:
-1. **Executive Summary**: What was built and why
-2. **Traceability Matrix**: Files ↔ Requirements mapping
-3. **Code Quality Metrics**: Test results, coverage if available
-4. **Best Practices Compliance**: SOLID, DRY, security checks
-5. **Risk Assessment**: Known limitations, technical debt introduced
-6. **Testing Summary**: What was tested, edge cases covered
-
-### Step 4.3 — Create Merge Request
-Execute via `#terminal`:
+### Paso 4.3 — Creación del Merge Request en Modo Borrador (`glab mr create`)
+Ejecutar el comando no interactivo conforme a `references/glab-commands.md`:
 ```bash
 glab mr create \
-  --title "feat({FormattedID}): {title}" \
+  --title "feat({FormattedID}): {Title}" \
   --description-file .docs/report.md \
   --target-branch main \
   --source-branch "$BRANCH_NAME" \
@@ -233,69 +240,79 @@ glab mr create \
   --label "bot-generated,{FormattedID}" \
   --yes
 ```
+Capturar de la salida estándar:
+- La URL completa del Merge Request (`MR_URL`).
+- El identificador numérico interno del MR (`MR_IID`).
 
-Capture the MR URL from stdout.
-
-### Step 4.4 — Add MR Notes
+### Paso 4.4 — Inserción de Nota Técnica en el MR
 ```bash
-glab mr note create {MR_IID} \
-  -m "## 🤖 Automated SDLC Report
+glab mr note create {MR_IID} -m "## 🤖 Reporte de Validación Automatizada
+- **Rally Story:** {FormattedID}
+- **Tests ejecutados:** {PASS_COUNT}/{TOTAL_COUNT} en verde
+- **Documentos generados:** \`.docs/requerimientos.md\`, \`.docs/diseno.md\`, \`.docs/report.md\`
 
-**Rally Issue:** {FormattedID}
-**Specification:** See \`.docs/requerimientos.md\` and \`.docs/diseño.md\`
-**Tests:** {PASS_COUNT}/{TOTAL_COUNT} passing
-
-This MR was generated by the SDLC Automation Agent.
-Please review the draft and mark as ready when approved."
+Merge Request generado como borrador (**Draft**) a la espera de inspección humana."
 ```
 
-### Step 4.5 — VCS Review Gate
-**🚪 GATE 4**: Present MR details.
-"Merge Request created:
-- MR URL: {MR_URL}
-- Branch: {BRANCH_NAME} → main
-- Status: Draft
-- Files changed: {N}
-
-Shall I proceed to update Rally with the MR reference?"
+### 🚪 COMPUERTA HUMANA 4 (Gate 4: Verificación de MR)
+Presentar al usuario los datos del MR creado:
+> *"Merge Request creado satisfactoriamente:*  
+> *- **URL:** {MR_URL}*  
+> *- **Rama:** {BRANCH_NAME} ➔ main*  
+> *- **Modo:** Draft (Borrador protegido)*  
+> *¿Deseas que proceda al cierre y actualización de Rally con el enlace del MR?"*
 
 ---
 
-## Phase 5: Rally Update & Closure
+## Fase 5: Cierre de Trazabilidad y Sincronización en Rally
 
-### Step 5.1 — Update Rally State
-Use `rally_openapi_invoke_tool` to:
-```
+### Paso 5.1 — Actualización de Estado en Rally a "Completed"
+Invocar `rally_openapi_invoke_tool` para actualizar la historia o defecto:
+```json
 POST hierarchicalrequirement/{ObjectID}
-  payload: { "ScheduleState": "Completed" }
+{
+  "ScheduleState": "Completed"
+}
 ```
 
-### Step 5.2 — Add Rally Discussion Comment
-Use `rally_openapi_invoke_tool` to add a ConversationPost:
-```
-Message: "Implementation completed by SDLC Automation Agent.
+### Paso 5.2 — Publicación de Comentario de Discusión en Rally
+Registrar en la conversación del ítem en Rally:
+```text
+Implementación técnica completada por Copilot SDLC Automation Agent.
 
 📋 Merge Request: {MR_URL}
-📝 Specification: See .docs/requerimientos.md in branch {BRANCH_NAME}
-📐 Design: See .docs/diseño.md in branch {BRANCH_NAME}
-📊 Report: See .docs/report.md in branch {BRANCH_NAME}
+🌿 Rama Git: {BRANCH_NAME}
+📄 Especificaciones EARS: .docs/requerimientos.md
+📐 Diseño Técnico: .docs/diseno.md
+📊 Reporte Post-Tarea: .docs/report.md
 
-Status: Awaiting human code review.
-Next step: Product Owner acceptance after MR merge."
+Estado: Esperando revisión humana de código en GitLab.
+Aceptación final: Por el Product Owner tras la fusión del MR.
 ```
 
-### Step 5.3 — Final Summary
-Present to user:
-```
-✅ SDLC Cycle Complete for {FormattedID}
+### Paso 5.3 — Balance Final al Desarrollador
+Presentar la tarjeta final de cierre:
+```text
+🎉 Ciclo SDLC Completado Exitosamente para {FormattedID}
 
-📋 Rally:    {FormattedID} → Completed (was: {original_state})
-🔀 GitLab:   MR #{MR_IID} (Draft) → {MR_URL}
-📝 Specs:    .docs/requerimientos.md, .docs/diseño.md
-📊 Report:   .docs/report.md
-🧪 Tests:    {PASS_COUNT}/{TOTAL_COUNT} passing
+📋 Rally:        {FormattedID} ➔ Completed
+🔀 GitLab:       MR !{MR_IID} (Draft) ➔ {MR_URL}
+🌿 Rama:         {BRANCH_NAME}
+📝 Specs:        .docs/requerimientos.md, .docs/diseno.md
+📊 Reporte:      .docs/report.md
+🧪 Pruebas:      {PASS_COUNT}/{TOTAL_COUNT} pasando (100%)
 
-Pending actions:
-1. Review MR and mark as Ready
-2. Product Owner: Accept story in Rally after merge
+Próximos pasos requeridos:
+1. Revisor técnico: Inspeccionar el código en GitLab y retirar la marca de borrador (--draft).
+2. Product Owner: Validar funcionalidad y transicionar a "Accepted" en Rally tras el merge.
 ```
+
+---
+
+## Reglas de Seguridad Inviolables
+
+1. **PROHIBIDO** ejecutar comandos destructivos de git (`git push --force`, `git reset --hard` hacia ramas remotas, `git clean -fdx` indiscriminado).
+2. **PROHIBIDO** modificar archivos fuera del directorio de trabajo `${workspaceFolder}`.
+3. **OBLIGATORIO** crear todos los Merge Requests con el flag `--draft`.
+4. **OBLIGATORIO** respetar todas las compuertas humanas (Gates 1, 2, 3 y 4). Nunca continuar a la siguiente fase sin confirmación del usuario.
+5. **OBLIGATORIO** detenerse si el ciclo de auto-sanación de pruebas alcanza 3 iteraciones fallidas consecutivas.
